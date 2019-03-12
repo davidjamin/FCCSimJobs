@@ -190,8 +190,8 @@ with EventStore([infile_name]) as evs: # p.ex output of Examples/options/simple_
                     
                     if math.fabs(tlv.E()-math.sqrt(g.p4().mass**2+g.p4().px**2+g.p4().py**2+g.p4().pz**2))>0.01 and g.status==1:
                         print '=======================etlv  ',tlv.E(),'    ',math.sqrt(g.p4().mass**2+g.p4().px**2+g.p4().py**2+g.p4().pz**2),'  eta  ',eta,'   phi   ',phi,'  x  ',g.p4().px,'  y  ',g.p4().py,'  z  ',g.p4().pz
-                        gen_pdgid.push_back(g.pdgId())
-                        gen_status.push_back(g.status())
+                    gen_pdgid.push_back(g.pdgId())
+                    gen_status.push_back(g.status())
                         
                     if energyGen != 0.:
                         etaGen = float(etaGen)/float(energyGen)
