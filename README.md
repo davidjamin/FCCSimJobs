@@ -78,6 +78,7 @@ python python/send.py --singlePart --particle 11 -e 500 -n 10 -N 1 --condor --et
 python python/send.py --singlePart --particle -211 -e 10 -n 10 -N 1 --condor
 python python/send.py --physics --process Zqq --pt 1000 --etaMax 1.5 -n 10 -N 1 --lsf
 python python/send.py --physics --process Haa -n 10 -N 1 --lsf
+python python/send.py --physics --process Haa -n 10 -N 1 --condor --version v03_test_david
 ```
 
 Reconstruction
