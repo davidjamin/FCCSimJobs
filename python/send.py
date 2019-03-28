@@ -386,14 +386,16 @@ if __name__=="__main__":
             job_dir += "etaFull/"
         print "=================================="
     thebatch=''
+    queue = args.queue
     if args.condor:
         print "submitting to condor ..."
         thebatch='condor'
+        #
+        if queue != 'espresso' and queue != 'microcentury' and queue != 'longlunch' and queue != 'workday' and queue != 'tomorrow' and queue != 'testmatch' and queue != 'nextweek' : queue = 'nextweek'
     elif args.lsf:
         print "submitting to lxbatch ..."
-        queue = args.queue
-        print "queue: ", queue
         thebatch='lsf'
+    print "queue: ", queue
 
     rundir = os.getcwd()
     nbjobsSub=0
@@ -473,6 +475,11 @@ if __name__=="__main__":
         print card
         print os.path.isfile(card)
 
+    if args.lsf==False and args.condor==False:
+        print "Submit issue : LSF nor CONDOR flag defined !!!"
+        sys.exit(3)
+
+    condor_file_str=''
     seed=''
     uid=os.path.join(version, job_dir, job_type)
     for i in xrange(num_jobs):
@@ -665,43 +672,51 @@ if __name__=="__main__":
                 cmdBatch="bsub  -R 'rusage[mem=20000:pool=8000]' -q %s -cwd%s %s" %(queue, logdir,logdir+'/'+frunname)    
             batchid=-1
             job,batchid=ut.SubmitToLsf(cmdBatch,10)
+            nbjobsSub+=job
         elif args.no_submit:
-            job = 0
             print "scripts generated in ", os.path.join(logdir, frunname),
         else:
-            os.system("mkdir -p %s/out"%logdir)
-            os.system("mkdir -p %s/log"%logdir)
-            os.system("mkdir -p %s/err"%logdir)
-            # create also .sub file here
-            fsubname = frunname.replace('.sh','.sub')
-            fsub = None
-            try:
-                fsub = open(logdir+'/'+fsubname, 'w')
-            except IOError as e:
-                print "I/O error({0}): {1}".format(e.errno, e.strerror)
-                time.sleep(10)
-                fsub = open(logdir+'/'+fsubname, 'w')
-            print fsub
-            commands.getstatusoutput('chmod 777 %s/%s'%(logdir,fsubname))
-            fsub.write('executable            = %s/%s\n' %(logdir,frunname))
-            fsub.write('arguments             = $(ClusterID) $(ProcId)\n')
-            fsub.write('output                = %s/out/job.%s.$(ClusterId).$(ProcId).out\n'%(logdir,str(seed)))
-            fsub.write('log                   = %s/log/job.%s.$(ClusterId).log\n'%(logdir,str(seed)))
-            fsub.write('error                 = %s/err/job.%s.$(ClusterId).$(ProcId).err\n'%(logdir,str(seed)))
-            if args.physics:
-                fsub.write('RequestCpus = 8\n')
-            else:
-                fsub.write('RequestCpus = 4\n')
-            fsub.write('+JobFlavour = "nextweek"\n')
-            fsub.write('+AccountingGroup = "group_u_FCC.local_gen"\n')
-            fsub.write('queue 1\n')
-            fsub.close()
-            cmdBatch="condor_submit %s/%s"%(logdir.replace(current_dir+"/",''),fsubname)
+            condor_file_str+='%s/%s '%(logdir,frunname)
+            nbjobsSub+=1
 
-            print cmdBatch
-            batchid=-1
-            job,batchid=ut.SubmitToCondor(cmdBatch,10)
-
+    if args.condor :
+        # clean string
+        condor_file_str=condor_file_str.replace("//","/")
+        #
+        frunname_condor = frunname.replace('.sh','.sub')
+        frunfull_condor = '%s/%s'%(logdir,frunname_condor)
+        frun_condor = None
+        try:
+            frun_condor = open(frunfull_condor, 'w')
+        except IOError as e:
+            print "I/O error({0}): {1}".format(e.errno, e.strerror)
+            time.sleep(10)
+            frun_condor = open(frunfull_condor, 'w')
+        commands.getstatusoutput('chmod 777 %s'%frunfull_condor)
+        #
+        frun_condor.write('executable     = $(filename)\n')
+        frun_condor.write('arguments      = $(ClusterID) $(ProcId)\n')
+        frun_condor.write('Log            = %s/condor_job.%s.$(ClusterId).$(ProcId).log\n'%(logdir,str(seed)))
+        frun_condor.write('Output         = %s/condor_job.%s.$(ClusterId).$(ProcId).out\n'%(logdir,str(seed)))
+        frun_condor.write('Error          = %s/condor_job.%s.$(ClusterId).$(ProcId).error\n'%(logdir,str(seed)))
+        if args.physics:
+             frun_condor.write('RequestCpus = 8\n')
+        else:
+             frun_condor.write('RequestCpus = 4\n')
+#        frun_condor.write('requirements   = ( (OpSysAndVer =?= "CentOS7") && (Machine =!= LastRemoteHost) )\n')
+        frun_condor.write('requirements   = ( (OpSysAndVer =?= "SLCern6") && (Machine =!= LastRemoteHost) )\n')
+        frun_condor.write('on_exit_remove = (ExitBySignal == False) && (ExitCode == 0)\n')
+        frun_condor.write('max_retries    = 3\n')
+        frun_condor.write('+JobFlavour    = "%s"\n'%queue)
+        frun_condor.write('+AccountingGroup = "group_u_FCC.local_gen"\n')
+        frun_condor.write('queue filename matching files %s\n'%condor_file_str)
+        frun_condor.close()
+        #
+        nbjobsSub=0
+        cmdBatch="condor_submit %s"%frunfull_condor
+        print cmdBatch
+        batchid=-1
+        job,batchid=ut.SubmitToCondor(cmdBatch,10)
         nbjobsSub+=job
 
-    print 'succesfully sent %i  jobs'%nbjobsSub
+    print 'succesfully sent %i  job(s)'%nbjobsSub
